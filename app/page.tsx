@@ -46,11 +46,6 @@ export default function HomePage() {
   const [result, setResult] = useState<SpecResponse | null>(null);
   const [refineText, setRefineText] = useState("");
 
-  // 👇 tabs state (NOT USED now, but NOT deleted)
-  const [activeTab, setActiveTab] = useState<
-    "modules" | "features" | "stories" | "apis" | "db" | "questions"
-  >("modules");
-
   /* ---------------- ACCORDION STATE ---------------- */
 
   const [openSection, setOpenSection] = useState<string | null>(null);
@@ -59,13 +54,15 @@ export default function HomePage() {
     setOpenSection(prev => (prev === key ? null : key));
   };
 
-  type AccordionProps = {
+  const Accordion = ({
+    id,
+    title,
+    children,
+  }: {
     id: string;
     title: string;
     children: React.ReactNode;
-  };
-
-  const Accordion = ({ id, title, children }: AccordionProps) => {
+  }) => {
     const isOpen = openSection === id;
 
     return (
@@ -78,13 +75,7 @@ export default function HomePage() {
           <span className="text-xl">{isOpen ? "−" : "+"}</span>
         </button>
 
-        <div
-          className={`overflow-hidden transition-all duration-300 ${
-            isOpen ? "max-h-[2000px]opacity-100" : "max-h-0 opacity-0"
-          }`}
-        >
-          <div className="px-5 pb-5">{children}</div>
-        </div>
+        {isOpen && <div className="px-5 pb-5">{children}</div>}
       </div>
     );
   };
@@ -99,11 +90,14 @@ export default function HomePage() {
     setResult(null);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/specs/refine`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requirements_text: input }),
-      });
+      const res = await fetch(
+        "https://gaurikapare-api-copilot-backend.hf.space/specs/generate",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ requirements_text: input }),
+        }
+      );
 
       const data = await res.json();
 
@@ -113,56 +107,18 @@ export default function HomePage() {
 
       setResult(data);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Specification generation failed");
     } finally {
       setLoading(false);
     }
   }
 
-
-
-
-
+  /* ---------------- REFINE (DISABLED) ---------------- */
 
   async function handleRefine() {
-  if (!result?.spec || !refineText.trim()) {
-    setError("Generate spec first, then refine");
+    alert("Refine feature is currently disabled.");
     return;
   }
-
-  setLoading(true);
-  setError(null);
-
-  try {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_BASE}/specs/refine`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          spec: result.spec,
-          refinement_text: refineText,
-        }),
-      }
-    );
-
-    const data = await res.json();
-
-    if (!res.ok || data.status !== "success") {
-      throw new Error(data.message || "Refinement failed");
-    }
-
-    setResult(data);
-  } catch (err: any) {
-    setError(err.message);
-  } finally {
-    setLoading(false);
-  }
-}
-
-
-
-
 
   /* ---------------- UTIL ---------------- */
 
@@ -196,7 +152,6 @@ export default function HomePage() {
         Convert messy product requirements into structured technical specifications.
       </p>
 
-      {/* INPUT */}
       <div className="w-full max-w-3xl mt-10">
         <textarea
           value={input}
@@ -214,16 +169,13 @@ export default function HomePage() {
         {loading ? "Generating..." : "Generate Spec"}
       </button>
 
-      {error && <p className="mt-4 text-red-500 font-medium">{error}</p>}
+      {error && <p className="mt-4 text-red-500">{error}</p>}
 
-      {/* OUTPUT */}
       {result && (
         <section className="w-full max-w-5xl mt-16 border-t border-neutral-700 pt-10">
           <h2 className="text-2xl font-bold text-white mb-8">
             Generated Specification
           </h2>
-
-          {/* ACCORDIONS */}
 
           <Accordion id="modules" title="Modules">
             <Block title="Modules">
@@ -265,30 +217,18 @@ export default function HomePage() {
           <Accordion id="apis" title="API Endpoints">
             <Block title="API Endpoints">
               {result.spec.api_endpoints.map((api, i) => (
-                <div key={i}>
-                  <p>
-                    <b>{api.method}</b> {api.path}
-                  </p>
-                  <p className="text-neutral-400">
-                    Auth required: {api.auth_required ? "Yes" : "No"}
-                  </p>
-                </div>
+                <p key={i}>
+                  <b>{api.method}</b> {api.path}
+                </p>
               ))}
             </Block>
           </Accordion>
 
           <Accordion id="db" title="Database Schema">
             <Block title="Database Schema">
-              {result.spec.db_schema.map((table, i) => (
+              {result.spec.db_schema.map((t, i) => (
                 <div key={i}>
-                  <p className="font-semibold text-white">{table.table_name}</p>
-                  <ul className="list-disc ml-6">
-                    {table.columns.map((c, j) => (
-                      <li key={j}>
-                        {c.name} : {c.type}
-                      </li>
-                    ))}
-                  </ul>
+                  <b>{t.table_name}</b>
                 </div>
               ))}
             </Block>
@@ -304,50 +244,40 @@ export default function HomePage() {
             </Block>
           </Accordion>
 
-          {/* ACTIONS */}
           <div className="mt-10 flex gap-4 justify-center">
             <button
               onClick={copyJSON}
-              className="px-4 py-2 border border-white text-white rounded-md hover:bg-white hover:text-black"
+              className="px-4 py-2 border border-white text-white rounded-md"
             >
               Copy JSON
             </button>
-
             <button
               onClick={downloadJSON}
-              className="px-4 py-2 border border-white text-white rounded-md hover:bg-white hover:text-black"
+              className="px-4 py-2 border border-white text-white rounded-md"
             >
               Download JSON
             </button>
           </div>
 
-          {/* REFINE */}
-<div className="mt-12 w-full border-t border-neutral-700 pt-8">
-  <h3 className="text-lg font-bold text-white mb-3">
-    Refine Specification
-  </h3>
+          {/* REFINE UI (Backend disabled) */}
+          <div className="mt-12 w-full border-t border-neutral-700 pt-8">
+            <h3 className="text-lg font-bold text-white mb-3">
+              Refine Specification
+            </h3>
 
-  <textarea
-    value={refineText}
-    onChange={(e) => setRefineText(e.target.value)}
-    placeholder="Example: Add authentication to all APIs..."
-    className="w-full h-28 p-3 border border-neutral-700 rounded-md resize-none bg-[#0b0f19] text-white"
-  />
+            <textarea
+              value={refineText}
+              onChange={(e) => setRefineText(e.target.value)}
+              className="w-full h-28 p-3 border border-neutral-700 rounded-md resize-none bg-[#0b0f19] text-white"
+            />
 
-  {error && (
-    <p className="mt-2 text-red-400 text-sm">
-      Refinement failed. Showing last valid specification.
-    </p>
-  )}
-
-  <button
-    onClick={handleRefine}
-    className="mt-4 px-5 py-2 bg-white text-black rounded-md"
-  >
-    Refine Spec
-  </button>
-</div>
-
+            <button
+              onClick={handleRefine}
+              className="mt-4 px-5 py-2 bg-white text-black rounded-md"
+            >
+              Refine Spec
+            </button>
+          </div>
         </section>
       )}
     </main>
