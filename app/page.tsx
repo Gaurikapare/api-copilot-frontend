@@ -125,40 +125,41 @@ export default function HomePage() {
 
 
   async function handleRefine() {
-  if (!result || !refineText.trim()) return;
+  if (!result?.spec || !refineText.trim()) {
+    setError("Generate spec first, then refine");
+    return;
+  }
 
   setLoading(true);
   setError(null);
 
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/specs/refine`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        spec: result.spec,
-        refinement_text: refineText,
-      }),
-    });
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_BASE}/specs/refine`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          spec: result.spec,
+          refinement_text: refineText,
+        }),
+      }
+    );
 
     const data = await res.json();
 
-    if (data.status !== "success") {
+    if (!res.ok || data.status !== "success") {
       throw new Error(data.message || "Refinement failed");
     }
 
-    // 🔥 IMPORTANT: update SAME result
-    setResult({
-      ...result,
-      spec: data.spec,
-    });
-
-    setRefineText("");
+    setResult(data);
   } catch (err: any) {
     setError(err.message);
   } finally {
     setLoading(false);
   }
 }
+
 
 
 
